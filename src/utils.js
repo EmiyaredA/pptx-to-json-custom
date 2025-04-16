@@ -153,6 +153,12 @@ export function toHex(n) {
 export function hasValidText(htmlString) {
   if (!DOMParser) return true
 
+  // 检查是否在浏览器环境中
+  // if (typeof DOMParser === 'undefined') {
+  //   // 在 Node.js 环境中，简单地检查字符串是否包含非空白字符
+  //   return htmlString.replace(/<[^>]*>/g, '').trim() !== ''
+  // }
+
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlString, 'text/html')
   const text = doc.body.textContent || doc.body.innerText
