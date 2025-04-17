@@ -87,6 +87,15 @@
 			padding: 5px 10px;
 			color: #d14424;
 		}
+		.test-link {
+			margin-top: 10px;
+			padding: 8px 15px;
+			background-color: #2196F3;
+			color: white;
+			text-decoration: none;
+			border-radius: 4px;
+			font-weight: bold;
+		}
 	</style>
 </head>
 
@@ -101,6 +110,8 @@
 			<a target="_blank" href="https://github.com/pipipi-pikachu/pptx2json">Github仓库</a>
 			<a target="_blank" href="https://pipipi-pikachu.github.io/PPTist/">可视化测试</a>
 		</div>
+		
+		<a href="browser-test.html" class="test-link">打开调试测试页面</a>
 	</div>
 	<div id="jsoneditor"></div>
 	
@@ -116,9 +127,24 @@
 			
 			const reader = new FileReader()
 			reader.onload = async e => {
-				const json = await pptxtojson.parse(e.target.result)
-				editor.set(json)
-				console.log(json)
+				try {
+					console.log('开始解析文件...')
+					console.time('解析耗时')
+					
+					// 添加断点调试标记
+					debugger; // 这里会在浏览器中自动触发断点
+					
+					const json = await pptxtojson.parse(e.target.result)
+					
+					console.timeEnd('解析耗时')
+					console.log('解析完成，幻灯片数量:', json.slides.length)
+					
+					editor.set(json)
+					console.log(json)
+				} catch (error) {
+					console.error('解析出错:', error)
+					alert('解析出错: ' + error.message)
+				}
 			}
 			reader.readAsArrayBuffer(fileName)
 		})

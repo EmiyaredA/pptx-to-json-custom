@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PPTX to JSON 测试</title>
+  <!-- 确保使用UMD版本 -->
+  <script src="./dist/index.umd.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .upload-btn {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    #result {
+      white-space: pre-wrap;
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      max-height: 500px;
+      overflow: auto;
+    }
+    .debug-panel {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+    }
+    .debug-btn {
+      background-color: #2196F3;
+      color: white;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    #debug-output {
+      background-color: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow: auto;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>PPTX to JSON 测试工具</h1>
+  <input type="file" id="fileInput" accept=".pptx" style="display: none;">
+  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">选择PPTX文件</button>
+  
+  <div class="debug-panel">
+    <h3>调试面板</h3>
+    <button class="debug-btn" id="checkDOMParser">检查DOMParser</button>
+    <button class="debug-btn" id="checkLibrary">检查库加载</button>
+    <button class="debug-btn" id="toggleConsole">显示/隐藏控制台输出</button>
+    <div id="debug-output" style="display: none;">调试信息将显示在这里...</div>
+  </div>
+  
+  <div>
+    <h2>解析结果：</h2>
+    <pre id="result">请先上传PPTX文件...</pre>
+  </div>
+
+  <script>
+    // 调试函数
+    function log(message) {
+      console.log(message);
+      const debugOutput = document.getElementById('debug-output');
+      debugOutput.innerHTML += `<div>${message}</div>`;
+      debugOutput.scrollTop = debugOutput.scrollHeight;
+    }
+    
+    // 调试按钮事件
+    document.getElementById('checkDOMParser').addEventListener('click', () => {
+      const debugOutput = document.getElementById('debug-output');
+      debugOutput.style.display = 'block';
+      
+      if (typeof DOMParser === 'undefined') {
+        log('❌ DOMParser不可用，这在浏览器环境中不应该发生');
+      } else {
+        log('✅ DOMParser可用');
+        log(`DOMParser类型: ${typeof DOMParser}`);
+        log(`DOMParser实例: ${new DOMParser()}`);
+      }
+    });
+    
+    document.getElementById('checkLibrary').addEventListener('click', () => {
+      const debugOutput = document.getElementById('debug-output');
+      debugOutput.style.display = 'block';
+      
+      if (typeof pptxtojson === 'undefined') {
+        log('❌ pptxtojson库未正确加载');
+      } else {
+        log('✅ pptxtojson库已加载');
+        log(`pptxtojson类型: ${typeof pptxtojson}`);
+        log(`pptxtojson.parse类型: ${typeof pptxtojson.parse}`);
+        log(`可用方法: ${Object.keys(pptxtojson).join(', ')}`);
+      }
+    });
+    
+    document.getElementById('toggleConsole').addEventListener('click', () => {
+      const debugOutput = document.getElementById('debug-output');
+      debugOutput.style.display = debugOutput.style.display === 'none' ? 'block' : 'none';
+    });
+    
+    // 确保DOMParser在全局范围内可用
+    if (typeof DOMParser === 'undefined') {
+      console.error('DOMParser不可用，这在浏览器环境中不应该发生');
+      document.getElementById('result').textContent = 'DOMParser不可用，无法解析PPTX文件';
+    } else {
+      console.log('DOMParser可用');
+    }
+
+    // 检查pptxtojson是否正确加载
+    if (typeof pptxtojson === 'undefined') {
+      console.error('pptxtojson库未正确加载');
+      document.getElementById('result').textContent = 'pptxtojson库未正确加载，请检查脚本引用';
+    } else {
+      console.log('pptxtojson库已加载:', pptxtojson);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const resultElement = document.getElementById('result');
+      resultElement.textContent = '正在解析...';
+      
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          try {
+            console.log('文件已读取，开始解析...');
+            log(`开始解析文件: ${file.name} (${file.size} 字节)`);
+            
+            // 使用pptxtojson库的parse函数解析文件
+            const result = await pptxtojson.parse(e.target.result);
+            
+            // 显示结果
+            resultElement.textContent = JSON.stringify(result, null, 2);
+            
+            // 在控制台中也输出完整结果
+            console.log('完整解析结果:', result);
+            log(`解析完成，幻灯片数量: ${result.slides.length}`);
+            
+            // 可选：提供下载JSON文件的功能
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], {type: 'application/json'}));
+            downloadLink.download = 'output.json';
+            downloadLink.textContent = '下载JSON文件';
+            downloadLink.style.display = 'block';
+            downloadLink.style.marginTop = '20px';
+            resultElement.parentNode.appendChild(downloadLink);
+          } catch (error) {
+            resultElement.textContent = `解析错误: ${error.message}`;
+            console.error('解析错误:', error);
+            log(`❌ 解析错误: ${error.message}`);
+            log(`错误堆栈: ${error.stack}`);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (error) {
+        resultElement.textContent = `文件读取错误: ${error.message}`;
+        console.error('文件读取错误:', error);
+        log(`❌ 文件读取错误: ${error.message}`);
+      }
+    });
+  </script>
+</body>
+</html>

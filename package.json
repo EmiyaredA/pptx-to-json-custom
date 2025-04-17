@@ -10,6 +10,7 @@
 		"clean:dist": "rimraf dist",
 		"dev": "rollup -c -w",
 		"build": "rollup -c",
+		"build:dev": "cross-env NODE_ENV=development rollup -c",
 		"lint": "eslint src --ext .js,.jsx,.ts,.tsx"
 	},
 	"author": "pipipi_pikachu@163.com",
@@ -42,7 +43,9 @@
 		"@rollup/plugin-eslint": "^9.0.1",
 		"@rollup/plugin-node-resolve": "^15.0.1",
 		"@rollup/plugin-terser": "^0.1.0",
+		"cross-env": "^7.0.3",
 		"eslint": "^8.27.0",
+		"rimraf": "^3.0.2",
 		"rollup": "^3.3.0",
 		"rollup-plugin-node-builtins": "^2.1.2",
 		"rollup-plugin-node-globals": "^1.4.0"

@@ -10,7 +10,7 @@ import { getCustomShapePath } from './shape'
 import { extractFileExtension, base64ArrayBuffer, getTextByPathList, angleToDegrees, getMimeType, isVideoLink, escapeHtml, hasValidText } from './utils'
 import { getShadow } from './shadow'
 import { getTableBorders, getTableCellParams, getTableRowParams } from './table'
-import { RATIO_EMUs_Points } from './constants'
+import { RATIO_EMUs_Points, RATIO_EMUs_LineHeight } from './constants'
 import { findOMath, latexFormart, parseOMath } from './math'
 
 export async function parse(file) {
@@ -20,16 +20,19 @@ export async function parse(file) {
 
   const filesInfo = await getContentTypes(zip)
   const { width, height, defaultTextStyle } = await getSlideInfo(zip)
-  const { themeContent, themeColors } = await getTheme(zip)
+  const { themeContent, themeColors, themeColorsObj } = await getTheme(zip)
 
   for (const filename of filesInfo.slides) {
     const singleSlide = await processSingleSlide(zip, filename, themeContent, defaultTextStyle)
     slides.push(singleSlide)
   }
 
+  console.log('slides = ', slides)
+
   return {
     slides,
     themeColors,
+    themeColorsObj, 
     size: {
       width,
       height,
@@ -100,16 +103,38 @@ async function getTheme(zip) {
   const themeContent = await readXmlFile(zip, 'ppt/' + themeURI)
 
   const themeColors = []
+  const themeColorsObj = {}
   const clrScheme = getTextByPathList(themeContent, ['a:theme', 'a:themeElements', 'a:clrScheme'])
   if (clrScheme) {
     for (let i = 1; i <= 6; i++) {
       if (clrScheme[`a:accent${i}`] === undefined) break
       const color = getTextByPathList(clrScheme, [`a:accent${i}`, 'a:srgbClr', 'attrs', 'val'])
-      if (color) themeColors.push('#' + color)
+      if (color) {
+        themeColors.push('#' + color)
+        themeColorsObj[`accent${i}`] = '#' + color
+      }
+    }
+
+    // 补充暗色系颜色
+    for (let i = 1; i <= 2; i++) {
+      if (clrScheme[`a:dk${i}`] === undefined) break
+      const color = getTextByPathList(clrScheme, [`a:dk${i}`, 'a:srgbClr', 'attrs', 'val'])
+      if (color) {
+        themeColorsObj[`dk${i}`] = '#' + color
+      }
+    }
+
+    // 补充亮色系颜色
+    for (let i = 1; i <= 2; i++) {
+      if (clrScheme[`a:lt${i}`] === undefined) break
+      const color = getTextByPathList(clrScheme, [`a:lt${i}`, 'a:srgbClr', 'attrs', 'val'])
+      if (color) {
+        themeColorsObj[`lt${i}`] = '#' + color
+      }
     }
   }
 
-  return { themeContent, themeColors }
+  return { themeContent, themeColors, themeColorsObj }
 }
 
 async function processSingleSlide(zip, sldFileName, themeContent, defaultTextStyle) {
@@ -320,11 +345,14 @@ async function getLayoutElements(warpObj) {
         }
       } 
       else {
-        const ph = getTextByPathList(nodesSldLayout[nodeKey], ['p:nvSpPr', 'p:nvPr', 'p:ph'])
-        if (!ph) {
-          const ret = await processNodesInSlide(nodeKey, nodesSldLayout[nodeKey], nodesSldLayout, warpObj, 'slideLayoutBg')
-          if (ret) elements.push(ret)
-        }
+        // const ph = getTextByPathList(nodesSldLayout[nodeKey], ['p:nvSpPr', 'p:nvPr', 'p:ph'])
+        // if (!ph) {
+        //   const ret = await processNodesInSlide(nodeKey, nodesSldLayout[nodeKey], nodesSldLayout, warpObj, 'slideLayoutBg')
+        //   if (ret) elements.push(ret)
+        // }
+
+        const ret = await processNodesInSlide(nodeKey, nodesSldLayout[nodeKey], nodesSldLayout, warpObj, 'slideLayoutBg')
+        if (ret) elements.push(ret)
       }
     }
   }
@@ -509,6 +537,7 @@ async function processGroupSpNode(node, warpObj, source) {
 
 async function processSpNode(node, pNode, warpObj, source) {
   const name = getTextByPathList(node, ['p:nvSpPr', 'p:cNvPr', 'attrs', 'name'])
+
   const idx = getTextByPathList(node, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs', 'idx'])
   let type = getTextByPathList(node, ['p:nvSpPr', 'p:nvPr', 'p:ph', 'attrs', 'type'])
   const order = getTextByPathList(node, ['attrs', 'order'])
@@ -560,6 +589,8 @@ async function genShape(node, pNode, slideLayoutSpNode, slideMasterSpNode, name,
   const slideMasterXfrmNode = getTextByPathList(slideMasterSpNode, xfrmList)
 
   const shapType = getTextByPathList(node, ['p:spPr', 'a:prstGeom', 'attrs', 'prst'])
+  const gd = getTextByPathList(node, ['p:spPr', 'a:prstGeom', 'a:avLst', 'a:gd'])
+  console.log('gd = ', gd)
   const custShapType = getTextByPathList(node, ['p:spPr', 'a:custGeom'])
 
   const { top, left } = getPosition(slideXfrmNode, slideLayoutXfrmNode, slideMasterXfrmNode)
@@ -591,6 +622,9 @@ async function genShape(node, pNode, slideLayoutSpNode, slideMasterSpNode, name,
   const vAlign = getVerticalAlign(node, slideLayoutSpNode, slideMasterSpNode, type)
   const isVertical = getTextByPathList(node, ['p:txBody', 'a:bodyPr', 'attrs', 'vert']) === 'eaVert'
 
+  const originalLineHeight = getTextByPathList(node, ['p:txBody', 'a:p', 'a:pPr', 'a:lnSpc', 'a:spcPct', 'attrs', 'val'])
+  const lineHeight = parseInt(originalLineHeight) * RATIO_EMUs_LineHeight
+
   const data = {
     left,
     top,
@@ -608,6 +642,7 @@ async function genShape(node, pNode, slideLayoutSpNode, slideMasterSpNode, name,
     vAlign,
     name,
     order,
+    lineHeight,
   }
 
   if (shadow) data.shadow = shadow
@@ -622,7 +657,7 @@ async function genShape(node, pNode, slideLayoutSpNode, slideMasterSpNode, name,
     return {
       ...data,
       type: 'shape',
-      shapType: 'custom',
+      shapType: shapType || 'custom', 
       path: d,
     }
   }
